@@ -24,7 +24,7 @@ The interface will be designed to be lightweight, avoiding heavy external depend
 | **Rendering** | Rich Terminal Text/Markdown | `RichTextLabel` with BBCode | Custom syntax highlighting |
 | **History** | Persistent thread history | Session-based chat history | Persistent local chat history |
 | **Input** | Terminal prompt | `TextEdit` / `LineEdit` at the bottom | Multiline input with auto-resize |
-| **Tool Use** | Automatic file/system access | None (out of scope for MVP) | Full Godot API & OS tool access |
+| **Tool Use** | Automatic file/system access | Core basic system tools | Full Godot API & custom OS tools |
 
 **MVP UI Components:**
 - **Chat Display:** A scrolling `RichTextLabel` with BBCode enabled. Basic formatting (bold, italics, code blocks) will be translated from the API's markdown responses into BBCode. Syntax highlighting will be kept to a minimum or handled via simple color tags to ensure the plugin remains lightweight.
@@ -32,7 +32,21 @@ The interface will be designed to be lightweight, avoiding heavy external depend
 - **Submit Button:** A button to send the prompt.
 - **Loading Indicator:** A simple visual cue (e.g., spinning icon or text ellipsis) while waiting for the Gemini API response.
 
-## 4. Implementation Steps (MVP)
+## 4. MVP Tool Set
+To truly mimic Claude Code's capabilities, Glaude's MVP will support **core system tools** via the Gemini function calling API.
+
+**Included MVP Tools (Replicating Real Claude capabilities):**
+- `BashTool` (or `PowerShellTool` for Windows) - Executing OS shell commands via `OS.execute()`.
+- `FileEditTool` - Modifying files using string replacements or diffs.
+- `FileReadTool` - Reading files via Godot's `FileAccess`.
+- `FileWriteTool` - Creating or overwriting files entirely.
+- `GlobTool` / `GrepTool` - Listing files or searching file contents inside the project directory via `DirAccess` and Regex.
+- `AskUserQuestionTool` - Pausing execution to explicitly prompt the developer for an answer.
+
+**Excluded Tools (Anti-Distillation "Poison Pills"):**
+Claude Code's internal implementation contains "fake" tools designed specifically to prevent model distillation (e.g. `TaskCreateTool`, `TeamDeleteTool`, `CronCreateTool`, `TestingPermissionTool`, `SleepTool`). These are explicitly **out of scope** and will not be mirrored in Glaude.
+
+## 5. Implementation Steps (MVP)
 1. **Plugin Initialization:**
    - Create the `plugin.cfg` and main `editor_plugin.gd` script.
    - Register the addon to add a control to the Script Editor bottom/side dock.
@@ -40,16 +54,14 @@ The interface will be designed to be lightweight, avoiding heavy external depend
    - Implement logic to add/read the `gemini_api_key` in `EditorInterface.get_editor_settings()`.
 3. **UI Layout:**
    - Build a `.tscn` file for the chat interface (VBoxContainer containing a RichTextLabel, HBoxContainer with TextEdit and Button).
-4. **API Integration:**
+4. **API Integration & Function Calling:**
    - Create a `GeminiClient` script that manages an `HTTPRequest` node.
-   - Construct the JSON payload required by the Gemini API (e.g., `gemini-1.5-flash` or `gemini-1.5-pro`).
-   - Parse the JSON response and extract the text.
-5. **Message Formatting:**
-   - Write a lightweight parser to convert basic Markdown (like `**bold**` or ```code```) into Godot's BBCode equivalents (`[b]bold[/b]`, `[code]code[/code]`).
+   - Construct the JSON payload for the Gemini API (e.g., `gemini-1.5-flash`), providing definitions for the MVP toolset array.
+   - Parse tool call requests from the API response.
+5. **Tool Execution:**
+   - Map requested tools to GDScript implementations (e.g., reading a file via `FileAccess.get_file_as_string()` when `FileReadTool` is called) and append the tool response back into the chat history payload to send back to the API.
 
-## 5. Future Phase: Tool Use (Out of Scope for MVP)
-To truly match "Claude Code" capabilities, future iterations will introduce Gemini Function Calling (Tools).
-- **File System Access:** Tools to read/write/list files using Godot's `FileAccess` and `DirAccess`.
-- **System Commands:** A tool to execute bash/cmd scripts via `OS.execute()`.
-- **Godot Context:** Tools to query the current open script, active scene, or project structure (`EditorInterface` API).
-- **Automated Actions:** Allowing the AI to write scripts and create nodes automatically, requiring user confirmation for security.
+## 6. Future Phase: Godot Context (Out of Scope for MVP)
+While basic file and system tools are in the MVP, deeper integrations specific to the engine will be reserved for future updates:
+- **Godot Context Tools:** Tools specifically querying the current open script, the active scene tree in the editor, or the `EditorInterface` API itself.
+- **Automated Engine Actions:** Allowing the AI to generate or attach nodes, configure Godot signals natively, or modify `.tscn` binary configurations safely.
